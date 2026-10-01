@@ -1,5 +1,7 @@
 # Logika Enkripsi AES-256-GCM
 
+![Diagram AES-256-GCM](./contoh.png)
+
 Program ini menggunakan **AES-256-GCM** untuk mengenkripsi teks dengan 3 level. Perbedaan setiap level terletak pada karakter yang digunakan untuk menampilkan **hasil enkripsi**.
 
 ## Level Enkripsi
