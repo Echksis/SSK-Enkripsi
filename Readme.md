@@ -1,6 +1,6 @@
 # Logika Enkripsi AES-256-GCM
 
-Program ini menggunakan **AES-256-GCM** untuk mengenkripsi teks dengan 3 level berdasarkan jenis karakter yang diperbolehkan.
+Program ini menggunakan **AES-256-GCM** untuk mengenkripsi teks dengan 3 level. Perbedaan setiap level terletak pada karakter yang digunakan untuk menampilkan **hasil enkripsi**.
 
 ## Level Enkripsi
 
@@ -10,7 +10,7 @@ Level 2 → Huruf + Angka
 Level 3 → Huruf + Angka + Simbol
 ```
 
-Ketiga level tetap menggunakan **AES-256-GCM**. Perbedaannya hanya pada karakter yang dapat dimasukkan.
+Ketiga level tetap menggunakan **AES-256-GCM**. Input teks dapat berisi karakter apa saja, sedangkan level menentukan karakter yang digunakan pada hasil enkripsi.
 
 ## Cara Kerja
 
@@ -21,17 +21,15 @@ Input Teks
     ↓
 Pilih Level
     ↓
-Validasi Karakter
-    ↓
 Generate Key AES-256
     ↓
 Generate Nonce Random
     ↓
 AES-256-GCM
     ↓
-Ciphertext
+Ciphertext + Authentication Tag
     ↓
-Base64
+Encoding berdasarkan Level
     ↓
 Hasil Enkripsi
 ```
@@ -40,31 +38,46 @@ Hasil Enkripsi
 
 User memasukkan teks dan memilih level.
 
-Program kemudian memeriksa apakah karakter pada teks sesuai dengan level yang dipilih.
+Berbeda dengan pembatasan input, program ini **menerima teks dengan karakter apa saja**.
 
 Contoh:
 
 ```text
-Level 1 → Hello       ✓
-Level 2 → Hello123    ✓
-Level 3 → Hello123!   ✓
+NAJIB
+NAJIB123
+NAJIB @#$ 123
+Hello_World!
+```
+
+Semua input tersebut dapat diproses pada Level 1, 2, maupun 3.
+
+Perbedaannya terdapat pada karakter yang digunakan untuk menampilkan hasil enkripsi.
+
+```text
+Level 1 → hanya huruf
+Level 2 → huruf + angka
+Level 3 → huruf + angka + simbol
 ```
 
 ### 2. Key AES-256
 
-Program membuat **key berukuran 256 bit** yang digunakan untuk proses enkripsi.
+Program membuat **key berukuran 256 bit** secara random.
 
 ```text
-Plaintext + Key
-       ↓
-    AES-256-GCM
+Generate Key
+     ↓
+  256 bit
+     ↓
+AES-256 Key
 ```
 
-Key yang digunakan saat dekripsi harus sama dengan key saat enkripsi.
+Key digunakan untuk proses enkripsi dan harus sama ketika melakukan dekripsi.
+
+Key bersifat rahasia dan tidak digabungkan dengan ciphertext.
 
 ### 3. Random Nonce
 
-Setiap enkripsi membuat **nonce random 12 byte**.
+Setiap proses enkripsi membuat **nonce random sebesar 12 byte**.
 
 ```text
 Teks yang sama
@@ -76,11 +89,13 @@ Nonce berbeda
 Ciphertext berbeda
 ```
 
-Karena itu, jika teks yang sama dienkripsi beberapa kali, hasilnya tetap dapat berbeda.
+Nonce digunakan agar teks dan key yang sama tidak selalu menghasilkan ciphertext yang sama.
+
+Nonce tidak perlu dirahasiakan dan disimpan bersama ciphertext agar dapat digunakan kembali saat dekripsi.
 
 ### 4. AES-256-GCM
 
-Plaintext diproses menggunakan AES-256-GCM bersama key dan nonce.
+Plaintext diproses menggunakan AES-256-GCM dengan key dan nonce.
 
 ```text
 Plaintext
@@ -91,39 +106,87 @@ Random Nonce
     ↓
 AES-256-GCM
     ↓
-Ciphertext
+Ciphertext + Authentication Tag
 ```
 
-GCM juga menghasilkan **authentication tag** yang digunakan untuk memastikan data tidak berubah saat proses dekripsi.
+Authentication tag digunakan untuk memeriksa apakah ciphertext masih valid dan tidak mengalami perubahan saat proses dekripsi.
 
-### 5. Base64
+### 5. Encoding Berdasarkan Level
 
-Hasil enkripsi berupa data binary kemudian diubah menjadi Base64 agar dapat ditampilkan sebagai teks.
+Hasil dari AES berupa data binary sehingga tidak langsung ditampilkan sebagai karakter biasa.
+
+Program kemudian mengubah data tersebut menggunakan alphabet sesuai level.
+
+```text
+Level 1
+↓
+Huruf
+
+Level 2
+↓
+Huruf + Angka
+
+Level 3
+↓
+Huruf + Angka + Simbol
+```
+
+Contohnya, hasil AES yang sama dapat diubah menggunakan alphabet yang berbeda sehingga karakter pada hasil akhirnya mengikuti level yang dipilih.
+
+Proses ini bukan enkripsi tambahan, tetapi **encoding** agar ciphertext dapat ditampilkan menggunakan karakter yang sesuai dengan level.
+
+### 6. Proses Dekripsi
+
+Saat dekripsi, hasil encoding dikembalikan menjadi data binary.
 
 ```text
 Ciphertext
     ↓
-Base64
+Decode berdasarkan Level
     ↓
-Encrypted Text
+Ambil Nonce
+    ↓
+Ambil Ciphertext + Authentication Tag
+    ↓
+AES-256-GCM
+    ↓
+Plaintext
 ```
+
+Key dan level yang digunakan harus sesuai dengan proses enkripsi.
 
 ## Inti Logika
 
 ```text
-LEVEL
-  ↓
-Validasi Input
-  ↓
-Plaintext
-  ↓
-AES-256 Key + Random Nonce
-  ↓
+INPUT BEBAS
+     ↓
+Pilih Level
+     ↓
+Generate AES-256 Key
+     ↓
+Generate Random Nonce
+     ↓
 AES-256-GCM
-  ↓
+     ↓
 Ciphertext + Authentication Tag
-  ↓
-Base64
-  ↓
-Hasil Enkripsi
+     ↓
+Encoding sesuai Level
+     ↓
+HASIL ENKRIPSI
+```
+
+Perbedaan ketiga level hanya terletak pada **karakter yang digunakan untuk menampilkan hasil enkripsi**:
+
+```text
+Level 1 → Huruf
+
+Level 2 → Huruf + Angka
+
+Level 3 → Huruf + Angka + Simbol
+```
+
+Sedangkan algoritma enkripsi yang digunakan pada semua level tetap:
+
+```text
+AES-256-GCM
 ```
