@@ -1,107 +1,133 @@
+import os
+import base64
 import string
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-# =========================================================
-# 3-LEVEL ENKRIPSI
-# =========================================================
+LEVEL_1 = string.ascii_letters
 
-ALPHABET = string.ascii_letters
+LEVEL_2 = string.ascii_letters + string.digits
 
-NUMBERS = string.digits
+LEVEL_3 = string.ascii_letters + string.digits + \
+          "!@#$%^&*()-_=+[]{}<>?/|~"
 
-SYMBOLS = "!@#$%^&*()-_=+[]{}<>?/|~"
+def generate_key():
+    # AES-256 membutuhkan key 32 byte = 256 bit
+    return AESGCM.generate_key(bit_length=256)
 
-
-def encrypt(text, level, key):
-    """
-    Level 1 : huruf
-    Level 2 : huruf + angka
-    Level 3 : huruf + angka + simbol
-    """
+def validate_text(text, level):
 
     if level == 1:
-        charset = string.ascii_letters
+        charset = LEVEL_1
+
     elif level == 2:
-        charset = string.ascii_letters + string.digits
+        charset = LEVEL_2
+
     elif level == 3:
-        charset = string.ascii_letters + string.digits + SYMBOLS
+        charset = LEVEL_3
+
     else:
-        return "Level harus 1, 2, atau 3"
+        return False
 
-    result = []
-
-    # Membuat angka kunci dari karakter key
-    key_value = sum(ord(c) for c in key)
-
-    for i, char in enumerate(text):
-
-        # Karakter yang tidak ada dalam charset tetap dipertahankan
+    for char in text:
         if char not in charset:
-            result.append(char)
-            continue
+            return False
 
-        # Pola pergeseran berubah berdasarkan:
-        # 1. posisi karakter
-        # 2. nilai ASCII
-        # 3. nilai key
-        shift = (
-            key_value
-            + (i + 1) ** 2
-            + ord(char) * (i + 3)
-        )
+    return True
 
-        # Tambahan pengacakan berdasarkan level
-        if level == 1:
-            shift += 17
+def encrypt(text, key):
 
-        elif level == 2:
-            shift += 43 + (i * 7)
+    aes = AESGCM(key)
 
-        elif level == 3:
-            shift += 91 + (i * 13)
+    # Nonce random 12 byte
+    nonce = os.urandom(12)
 
-        # Cari posisi karakter
-        index = charset.index(char)
+    # Ubah plaintext menjadi byte
+    plaintext = text.encode("utf-8")
 
-        # Geser karakter
-        new_index = (index + shift) % len(charset)
+    # AES-GCM mengenkripsi sekaligus membuat authentication tag
+    ciphertext = aes.encrypt(
+        nonce,
+        plaintext,
+        None
+    )
 
-        result.append(charset[new_index])
+    # Nonce digabung dengan ciphertext
+    result = nonce + ciphertext
 
-    # Tahap kedua: membalik blok berdasarkan level
-    encrypted = "".join(result)
+    # Diubah menjadi Base64 agar mudah ditampilkan
+    return base64.b64encode(result).decode("utf-8")
 
-    if level == 1:
-        encrypted = encrypted[::-1]
+def decrypt(encrypted_text, key):
 
-    elif level == 2:
-        encrypted = encrypted[::2] + encrypted[1::2]
+    aes = AESGCM(key)
 
-    elif level == 3:
-        encrypted = encrypted[::-1]
-        encrypted = encrypted[::2] + encrypted[1::2]
+    # Kembalikan Base64 menjadi byte
+    data = base64.b64decode(encrypted_text)
 
-    return encrypted
+    # 12 byte pertama adalah nonce
+    nonce = data[:12]
 
+    # Sisanya adalah ciphertext + authentication tag
+    ciphertext = data[12:]
 
-# =========================================================
-# PROGRAM UTAMA
-# =========================================================
+    # Dekripsi
+    plaintext = aes.decrypt(
+        nonce,
+        ciphertext,
+        None
+    )
 
-print("===================================")
-print("       ENKRIPSI 3 LEVEL")
-print("===================================")
+    return plaintext.decode("utf-8")
 
-text = input("Masukkan teks : ")
-key = input("Masukkan kunci : ")
+print("======================================")
+print("       AES-256-GCM ENCRYPTION")
+print("======================================")
 
-print("\nPilih level:")
+print("\nPilih Level:")
 print("1. Huruf")
 print("2. Huruf + Angka")
 print("3. Huruf + Angka + Simbol")
 
-level = int(input("Level : "))
+level = int(input("\nLevel: "))
 
-hasil = encrypt(text, level, key)
+if level not in [1, 2, 3]:
+    print("Level harus 1, 2, atau 3.")
+    exit()
 
-print("\nHasil Enkripsi:")
-print(hasil)
+text = input("Masukkan teks: ")
+
+if not validate_text(text, level):
+    print("\nTeks mengandung karakter yang tidak diperbolehkan.")
+    
+    if level == 1:
+        print("Level 1 hanya menerima huruf.")
+
+    elif level == 2:
+        print("Level 2 hanya menerima huruf dan angka.")
+
+    elif level == 3:
+        print("Level 3 menerima huruf, angka, dan simbol.")
+
+    exit()
+
+key = generate_key()
+
+key_base64 = base64.b64encode(key).decode("utf-8")
+
+encrypted = encrypt(text, key)
+
+print("\n======================================")
+print("HASIL ENKRIPSI")
+print("======================================")
+
+print("Level       :", level)
+print("AES Key     :", key_base64)
+print("Ciphertext  :", encrypted)
+
+decrypted = decrypt(encrypted, key)
+
+print("\n======================================")
+print("HASIL DEKRIPSI")
+print("======================================")
+
+print("Plaintext   :", decrypted)
